@@ -1,5 +1,7 @@
 import datetime
 import enum
+import random
+import time
 from json import load, dump
 from typing import Dict, Collection, Any
 
@@ -45,6 +47,10 @@ class Event:
         self.participants_substituted = participants['participantsSubstituted']
         self.member_reservation_details = memberReservationDetails
 
+    @property
+    def pretty_format(self):
+        return f'id:{self.id}\t| {self.start_date.replace("T", " ")}\t--- {self.end_date.replace("T", " ")}\t| ins: {self.instructor}'
+
     def __str__(self):
         return f'{self.id=} {self.start_date=} {self.end_date=} {self.maximum_participants=} {self.maximum_substitutions=} {self.instructor=} {self.participants_ok=} {self.participants_substituted=} {self.member_reservation_details=}'.replace(
             'self.', '')
@@ -65,7 +71,7 @@ class APIHelper:
             return resp.json()
         elif 400 <= resp.status_code < 500:
             print(f"Error: {resp.json()['detail']}")
-            raise ValidationError(f"Not permitted, {resp.status_code}",resp=resp)
+            raise ValidationError(f"Not permitted, {resp.status_code}", resp=resp)
 
         raise Exception("Unsupported Error Occurred! Most probably it's not ur fault ;)")
 
@@ -161,6 +167,9 @@ class Facade:
     def get_list(self):
         return [Event(**ob) for ob in APIHelper.get_list(self.credentials)]
 
+    def print_list(self):
+        print('\n'.join(str(x) for x in self.get_list()))
+
     def get_event_of_id(self, id: int) -> Event:
         return next(iter(filter(lambda x: x.id == id, self.get_list())))
 
@@ -171,11 +180,101 @@ class Facade:
         return APIHelper.reserve(self.credentials, event)
 
 
+class ApplicationBot:
+    def __init__(self, interval=1.0):
+        self.facade = Facade()
+        self.interval = interval
+
+    @property
+    def help(self):
+        return \
+            """Pomoc:
+            1. Wypisanie zajęć.
+            2. Dokonanie rezerwacji na id eventu.
+            
+            0. Wyjście.
+            """
+
+    def mainloop(self):
+        self.print_help()
+
+        while True:
+            cmd = input(' ~ ')
+
+            match cmd:
+                case '0':
+                    break
+                case '1':
+                    self.list()
+
+                case '2':
+                    self.reserve()
+                case _:
+                    self.print_help()
+        return self
+
+    def list(self):
+        print(
+            '\n'.join(x.pretty_format for x in self.facade.get_list())
+        )
+
+    def reserve(self):
+        while True:
+            try:
+                val = int(input("Podaj id zajęć do rezerwacji, lub 0 by anulować: ~ "))
+                break
+            except ValueError:
+                print("Nie podano poprawnego nr rezerwacji")
+                continue
+
+        if val == 0:
+            print("ANULOWANO")
+            self.print_help()
+            return
+
+        a = random.randint(1, 4)
+        b = random.randint(1, 4)
+
+        try:
+            event = self.facade.get_event_of_id(val)
+            validation = int(input(f"Czy jesteś pewny/a? Podaj wynik działania: {a} + {b} = "))
+        except ValueError:
+            print("ANULOWANO")
+            self.print_help()
+            return
+        except StopIteration:
+            print("ANULOWANO - NIEPOPRAWNE ID LUB ZAJĘCIA NIE ISTNIEJĄ")
+            self.print_help()
+            return
+
+        if validation != a + b:
+            print("ANULOWANO")
+            self.print_help()
+            return
+
+        print("OK - przyjęte do realizacji!")
+
+        while True:
+            try:
+                print(self.facade.reserve(event))
+                print("Chyba się udało!")
+                break
+            except ValidationError as ve:
+                if ve.resp.status_code == 403:
+                    print(f'   {ve.resp.json()}')
+                    print("kontynuuję...")
+                    time.sleep(self.interval)
+                    continue
+        print("\nKONIEC!")
+        self.print_help()
+
+    def print_help(self):
+        print(self.help)
+
+
 def main():
-    f = Facade()
-    li = f.get_list()
-    print([str(x) for x in li])
-    f.reserve(f.get_event_of_id(32958))
+    ab = ApplicationBot().mainloop()
+    # ab.facade.print_list()
 
 
 if __name__ == '__main__':
