@@ -262,7 +262,7 @@ class ApplicationBot:
             except ValidationError as ve:
                 if ve.resp.status_code == 403:
                     print(f'   {ve.resp.json()}')
-                    print("kontynuuję...")
+                    print("kontynuuję próbę...")
                     time.sleep(self.interval)
                     continue
 
