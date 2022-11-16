@@ -8,7 +8,7 @@ from typing import Dict, Collection, Any
 import requests
 
 CLUB_ID = 100013
-DELTA = 6
+DELTA = 2
 
 
 class Field(enum.Enum):
