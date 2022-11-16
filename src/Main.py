@@ -265,6 +265,7 @@ class ApplicationBot:
                     print("kontynuuję...")
                     time.sleep(self.interval)
                     continue
+
         print("\nKONIEC!")
         self.print_help()
 
@@ -272,10 +273,5 @@ class ApplicationBot:
         print(self.help)
 
 
-def main():
-    ab = ApplicationBot().mainloop()
-    # ab.facade.print_list()
-
-
 if __name__ == '__main__':
-    main()
+    ApplicationBot().mainloop()
