@@ -69,7 +69,7 @@ class APIHelper:
 
         if 200 <= resp.status_code < 300:
             return resp.json()
-        elif 400 <= resp.status_code < 500:
+        if 400 <= resp.status_code < 500:
             print(f"Error: {resp.json()['detail']}")
             raise ValidationError(f"Not permitted, {resp.status_code}", resp=resp)
 
@@ -162,7 +162,7 @@ class Facade:
         for k, v in resp.items():
             self.credentials[k] = v
 
-        self._write_data_to_file()
+        # todo it should be able to refresh tokens! uncoment when finished self._write_data_to_file()
 
     def get_list(self):
         return [Event(**ob) for ob in APIHelper.get_list(self.credentials)]
