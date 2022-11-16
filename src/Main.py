@@ -1,8 +1,12 @@
+import datetime
 import enum
 from json import load, dump
-from typing import Dict, Collection
+from typing import Dict, Collection, Any
 
 import requests
+
+CLUB_ID = 100013
+DELTA = 3
 
 
 class Field(enum.Enum):
@@ -19,7 +23,7 @@ class ValidationError(Exception): pass
 
 class APIHelper:
     @staticmethod
-    def _abstract_request(url: str, body: dict | None, headers: dict | None = None) -> \
+    def _abstract_request_post(url: str, body: dict | None, headers: dict | None = None) -> \
             Dict[str, str | Collection | int | float]:
         _headers = {"Content-Type": "application/json;charset=UTF-8", }
         if headers:
@@ -27,6 +31,23 @@ class APIHelper:
         resp = requests.post(url,
                              json=body,
                              headers=_headers)
+
+        if 200 <= resp.status_code < 300:
+            return resp.json()
+        elif 400 <= resp.status_code < 500:
+            raise ValidationError(f"Not permitted, {resp.status_code}")
+
+        raise Exception("Unsupported Error Occurred! Most probably it's not ur fault ;)")
+
+    @staticmethod
+    def _abstract_authorized_request_get(credentials, url: str, headers: dict | None = None) -> \
+            Dict[str, Any] | Collection[Dict[str, Any]]:
+        _headers = {"Content-Type": "application/json;charset=UTF-8",
+                    "Authorization": f"{'Bearer' if 'bearer' == credentials[Field.TOKEN_TYPE.value] else ''} {credentials[Field.ACCESS.value]}"}
+        if headers:
+            _headers = {**_headers, **headers}
+        resp = requests.get(url,
+                            headers=_headers)
 
         if 200 <= resp.status_code < 300:
             return resp.json()
@@ -45,7 +66,38 @@ class APIHelper:
         body = {"email": login, "password": password}
         url = "https://klubowicz.cityfit.pl/api/tokens"
 
-        return APIHelper._abstract_request(url, body)
+        return APIHelper._abstract_request_post(url, body)
+
+    @staticmethod
+    def get_list(credentials) -> Collection[Dict[str, Any]]:
+        now = datetime.datetime.today().strftime('%Y-%m-%d')
+        future = (datetime.datetime.today() + datetime.timedelta(days=DELTA)).strftime('%Y-%m-%d')
+        url = f"https://klubowicz.cityfit.pl/api/classes/schedule?dateFrom={now}&dateTo={future}&clubId={CLUB_ID}&clubSchedule=true"
+
+        return APIHelper._abstract_authorized_request_get(credentials, url)
+
+
+class Event:
+    def __init__(self,
+                 id: int,
+                 startDate: str,
+                 endDate: str,
+                 maximumParticipants: int,
+                 maximumSubstitutions: int,
+                 instructor: dict,
+                 participants: dict,
+                 **kwargs):
+        self.id = id
+        self.start_date = startDate
+        self.end_date = endDate
+        self.maximum_participants = maximumParticipants
+        self.maximum_substitutions = maximumSubstitutions
+        self.instructor = instructor['name']
+        self.participants_ok = participants['participantsOk']
+        self.participants_substituted = participants['participantsSubstituted']
+
+    def __str__(self):
+        return f'{self.id=} {self.start_date=} {self.end_date=} {self.maximum_participants=} {self.maximum_substitutions=} {self.instructor=} {self.participants_ok=} {self.participants_substituted=}'.replace('self.','')
 
 
 class Facade:
@@ -63,8 +115,6 @@ class Facade:
                 or Field.TOKEN_TYPE.value not in self.data.keys():
             self._login()
 
-        self._update_secrets()
-
     def _read_data_from_file(self):
         with open(self.file_name, 'r') as file:
             self.data = load(file)
@@ -81,12 +131,15 @@ class Facade:
 
         self._write_data_to_file()
 
-    def _update_secrets(self):
-        pass
+    def get_list(self):
+        return [Event(**ob) for ob in APIHelper.get_list(self.data)]
+
 
 def main():
-    Facade()
-
+    f = Facade()
+    fff = f.get_list()
+    for ff in fff:
+        print(ff)
 
 if __name__ == '__main__':
     main()
